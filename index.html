@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-BTC Monitor</title>
+    <style>
+        :root { --primary: #f7931a; --bg: #f4f4f9; --card: #ffffff; --text: #333; --green: #e8f5e9; --green-text: #2e7d32; --red: #ffebee; --red-text: #c62828; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: var(--bg); color: var(--text); }
+        
+        /* Layout */
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .card { background: var(--card); padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        
+        /* Input Area */
+        .input-group { display: flex; gap: 10px; }
+        input[type="text"] { flex-grow: 1; padding: 12px; border: 1px solid #ddd; border-radius: 6px; }
+        button { padding: 12px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn-primary { background-color: var(--primary); color: white; }
+        .btn-primary:hover { background-color: #e08214; }
+        .btn-refresh { background-color: #2c3e50; color: white; }
+        .btn-secondary { background-color: #e0e0e0; color: #333; font-size: 0.9rem; padding: 8px 16px; }
+        .btn-secondary:hover { background-color: #d5d5d5; }
+        
+        /* Table */
+        .wallet-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.95rem; }
+        .wallet-table th { text-align: left; padding: 12px; color: #666; font-size: 0.85rem; border-bottom: 2px solid #eee; }
+        .wallet-table td { padding: 12px; border-bottom: 1px solid #eee; vertical-align: middle; }
+        .wallet-table tr:last-child td { border-bottom: none; }
+        
+        /* Status Colors */
+        .row-changed-up { background-color: var(--green); animation: highlight 2s; }
+        .row-changed-down { background-color: var(--red); animation: highlight 2s; }
+        .diff-tag { font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; margin-left: 8px; font-weight: bold; }
+        .diff-up { background: #c8e6c9; color: var(--green-text); }
+        .diff-down { background: #ffcdd2; color: var(--red-text); }
+
+        /* Typography */
+        .addr-text { font-family: monospace; color: #555; letter-spacing: -0.5px; }
+        .balance-text { font-weight: bold; font-size: 1.05rem; }
+        .meta-text { color: #888; font-size: 0.85rem; }
+        
+        /* Utilities */
+        .remove-btn { color: #999; cursor: pointer; font-size: 1.2rem; border: none; background: none; }
+        .remove-btn:hover { color: var(--red-text); }
+        .loading-bar { height: 4px; background: #ddd; width: 100%; margin-top: 10px; display: none; overflow: hidden; border-radius: 2px; }
+        .loading-bar div { height: 100%; background: var(--primary); width: 50%; animation: slide 1s infinite linear; }
+        
+        /* Import/Export Zone */
+        .actions-zone { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
+        #fileInput { display: none; }
+
+        @keyframes slide { 0% { margin-left: -50%; } 100% { margin-left: 100%; } }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>BTC Multi-Monitor</h1>
+        <button onclick="fetchAllData()" class="btn-refresh">↻ Refresh All</button>
+    </div>
+
+    <div class="card">
+        <div class="input-group">
+            <input type="text" id="newAddr" placeholder="Paste Bitcoin Address (bc1q... or 1A1z...)">
+            <button onclick="addAddress()" class="btn-primary">Track Address</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <div id="loading" class="loading-bar"><div></div></div>
+        
+        <table class="wallet-table">
+            <thead>
+                <tr>
+                    <th width="35%">Address</th>
+                    <th width="25%">Balance (BTC)</th>
+                    <th width="25%">Last Activity</th>
+                    <th width="10%">Tx Count</th>
+                    <th width="5%"></th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                </tbody>
+        </table>
+        <div id="emptyState" style="text-align: center; padding: 30px; color: #999;">
+            No addresses added yet.
+        </div>
+        
+        <div class="actions-zone" style="border-top: 1px solid #eee; padding-top: 15px; margin-top: 20px;">
+            <input type="file" id="fileInput" accept=".json" onchange="importData(this)">
+            <button onclick="triggerImport()" class="btn-secondary">⬆ Import JSON</button>
+            <button onclick="exportData()" class="btn-secondary">⬇ Export JSON</button>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIG & STORAGE ---
+        const STORE_KEY = 'btc_monitor_wallets_v2';
+        
+        let wallets = JSON.parse(localStorage.getItem(STORE_KEY)) || [];
+
+        // --- INIT ---
+        window.onload = function() {
+            renderTable();
+            if(wallets.length > 0) fetchAllData();
+        };
+
+        // --- CORE ACTIONS ---
+        function addAddress() {
+            const input = document.getElementById('newAddr');
+            const addr = input.value.trim();
+            
+            if (!addr) return;
+            if (wallets.find(w => w.address === addr)) return alert("Address already exists!");
+
+            wallets.push({ address: addr, lastKnownBalance: null, lastActivity: null, txCount: 0 });
+            save();
+            renderTable();
+            input.value = '';
+            fetchSingleAddress(addr);
+        }
+
+        function removeAddress(addr) {
+            if(!confirm('Remove this address?')) return;
+            wallets = wallets.filter(w => w.address !== addr);
+            save();
+            renderTable();
+        }
+
+        function save() {
+            localStorage.setItem(STORE_KEY, JSON.stringify(wallets));
+        }
+
+        // --- IMPORT / EXPORT LOGIC ---
+        function exportData() {
+            if(wallets.length === 0) return alert("Nothing to export.");
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(wallets, null, 2));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "btc_wallets.json");
+            document.body.appendChild(downloadAnchorNode); // Required for Firefox
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
+        function triggerImport() {
+            document.getElementById('fileInput').click();
+        }
+
+        function importData(inputElement) {
+            const file = inputElement.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (!Array.isArray(imported)) throw new Error("File must contain a JSON array.");
+
+                    let addedCount = 0;
+                    imported.forEach(w => {
+                        // Merge Logic: Only add if address doesn't exist
+                        if (w.address && !wallets.find(existing => existing.address === w.address)) {
+                            // sanitize incoming object
+                            wallets.push({
+                                address: w.address,
+                                lastKnownBalance: w.lastKnownBalance || null,
+                                lastActivity: w.lastActivity || null,
+                                txCount: w.txCount || 0
+                            });
+                            addedCount++;
+                        }
+                    });
+
+                    save();
+                    renderTable();
+                    alert(`Success! Added ${addedCount} new addresses.`);
+                    if (addedCount > 0) fetchAllData(); // Refresh new data immediately
+
+                } catch (err) {
+                    alert("Import Failed: " + err.message);
+                }
+                // Reset input so same file can be selected again if needed
+                inputElement.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        // --- API FETCH LOGIC ---
+        async function fetchAllData() {
+            document.getElementById('loading').style.display = 'block';
+            const promises = wallets.map(w => fetchSingleAddress(w.address, false));
+            await Promise.all(promises);
+            renderTable();
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        async function fetchSingleAddress(addr, render = true) {
+            try {
+                // Fetch Stats
+                const resStats = await fetch(`https://mempool.space/api/address/${addr}`);
+                if(!resStats.ok) throw new Error("API Error");
+                const stats = await resStats.json();
+                
+                const chain_stats = stats.chain_stats;
+                const balanceSats = chain_stats.funded_txo_sum - chain_stats.spent_txo_sum;
+                const balanceBTC = balanceSats / 100000000;
+
+                // Fetch Txs for Time
+                const resTxs = await fetch(`https://mempool.space/api/address/${addr}/txs`);
+                const txs = await resTxs.json();
+                
+                let lastTime = "No activity";
+                if(txs.length > 0) {
+                    const latest = txs[0];
+                    lastTime = latest.status.confirmed 
+                        ? new Date(latest.status.block_time * 1000).toLocaleString() 
+                        : "Unconfirmed (Pending)";
+                }
+
+                // Update Data
+                const walletIndex = wallets.findIndex(w => w.address === addr);
+                if (walletIndex > -1) {
+                    wallets[walletIndex].previousBalance = wallets[walletIndex].lastKnownBalance;
+                    wallets[walletIndex].lastKnownBalance = balanceBTC;
+                    wallets[walletIndex].lastActivity = lastTime;
+                    wallets[walletIndex].txCount = chain_stats.tx_count;
+                    
+                    save();
+                    if(render) renderTable();
+                }
+
+            } catch (err) {
+                console.error("Error fetching " + addr, err);
+            }
+        }
+
+        // --- UI RENDER LOGIC ---
+        function renderTable() {
+            const tbody = document.getElementById('tableBody');
+            const empty = document.getElementById('emptyState');
+            tbody.innerHTML = '';
+
+            if (wallets.length === 0) {
+                empty.style.display = 'block';
+                return;
+            }
+            empty.style.display = 'none';
+
+            wallets.forEach(w => {
+                const tr = document.createElement('tr');
+                
+                // Diff Logic
+                let diffHtml = '';
+                let rowClass = '';
+                
+                if (w.previousBalance !== undefined && w.previousBalance !== null && w.lastKnownBalance !== null) {
+                    const diff = w.lastKnownBalance - w.previousBalance;
+                    // We use a small epsilon for float comparison to avoid false positives on rounding
+                    if (Math.abs(diff) > 0.00000001) {
+                        if (diff > 0) {
+                            diffHtml = `<span class="diff-tag diff-up">+${diff.toFixed(8)}</span>`;
+                            rowClass = 'row-changed-up';
+                        } else {
+                            diffHtml = `<span class="diff-tag diff-down">${diff.toFixed(8)}</span>`;
+                            rowClass = 'row-changed-down';
+                        }
+                    }
+                }
+
+                if(rowClass) tr.className = rowClass;
+
+                const bal = w.lastKnownBalance !== null ? w.lastKnownBalance.toFixed(8) : '...';
+                
+                tr.innerHTML = `
+                    <td><div class="addr-text">${w.address.substring(0, 8)}...${w.address.slice(-6)}</div></td>
+                    <td><span class="balance-text">${bal}</span> ${diffHtml}</td>
+                    <td><div class="meta-text">${w.lastActivity || '-'}</div></td>
+                    <td><div class="meta-text">${w.txCount}</div></td>
+                    <td style="text-align:right;"><button class="remove-btn" onclick="removeAddress('${w.address}')">×</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+    </script>
+</body>
+</html>
