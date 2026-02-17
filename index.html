@@ -44,10 +44,14 @@
         .stat-sub { font-size: 0.85rem; color: var(--success); margin-top: 5px; }
         
         /* Input Section */
-        .add-section { background: var(--surface); padding: 20px; border-radius: 15px; box-shadow: var(--shadow); margin-bottom: 25px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        .add-section { background: var(--surface); padding: 20px; border-radius: 15px; box-shadow: var(--shadow); margin-bottom: 25px; }
+        .add-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
         .input-group { flex-grow: 1; display: flex; gap: 10px; }
         input { padding: 12px 15px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); width: 100%; }
         
+        /* Data Tools Row */
+        .tools-row { margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; }
+
         /* Buttons */
         .btn { padding: 12px 20px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; }
         .btn-primary { background: var(--primary); color: white; }
@@ -65,7 +69,6 @@
         tr:hover { background: rgba(0,0,0,0.02); }
         
         .addr-pill { background: rgba(247, 147, 26, 0.1); color: var(--primary); padding: 4px 10px; border-radius: 20px; font-family: monospace; font-size: 0.9rem; cursor: pointer; }
-        .label-pill { background: #e9ecef; color: #495057; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 8px; border: 1px solid #ced4da; }
         
         /* Modal */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(5px); }
@@ -73,26 +76,18 @@
         .modal-header { padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--primary); color: white; }
         .modal-body { padding: 20px; overflow-y: auto; }
         
-        /* Tx List inside Modal */
+        /* Tx List */
         .tx-item { padding: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-        .tx-item:last-child { border-bottom: none; }
-        .tx-hash { color: var(--primary); text-decoration: none; font-family: monospace; }
-        .tx-in { color: var(--success); font-weight: bold; }
-        .tx-out { color: var(--danger); font-weight: bold; }
         .badge { font-size: 0.7rem; padding: 3px 6px; border-radius: 4px; text-transform: uppercase; }
         .badge-confirmed { background: #d1e7dd; color: #0f5132; }
-        .badge-pending { background: #fff3cd; color: #664d03; }
-
-        @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         
+        @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .loader { width: 100%; height: 4px; background: #e0e0e0; position: fixed; top: 0; left: 0; z-index: 9999; display: none; }
         .loader-bar { height: 100%; background: var(--primary); width: 0%; transition: width 0.3s; }
-        
-        /* Utilities */
-        .flex-row { display: flex; align-items: center; gap: 10px; }
-        .hidden { display: none !important; }
         .text-right { text-align: right; }
-        .cursor-pointer { cursor: pointer; }
+        .hidden { display: none; }
+        .tx-out { color: var(--danger); }
+        .tx-in { color: var(--success); }
     </style>
 </head>
 <body>
@@ -104,27 +99,33 @@
             <div class="stat-card">
                 <span class="stat-label"><i class="fab fa-bitcoin"></i> Bitcoin Price</span>
                 <span class="stat-value" id="btcPriceDisplay">Loading...</span>
-                <span class="stat-sub">Updated just now</span>
             </div>
             <div class="stat-card" style="border-left-color: #2196F3;">
                 <span class="stat-label"><i class="fas fa-wallet"></i> Portfolio Value</span>
                 <span class="stat-value" id="totalUsdDisplay">$0.00</span>
-                <span class="stat-sub" id="totalBtcDisplay">0.00000000 BTC</span>
-            </div>
-            <div class="stat-card" style="border-left-color: #9C27B0;">
-                <span class="stat-label"><i class="fas fa-list"></i> Tracked Wallets</span>
-                <span class="stat-value" id="walletCountDisplay">0</span>
-                <span class="stat-sub">Active addresses</span>
+                <span class="stat-sub" id="totalBtcDisplay">0.00 BTC</span>
             </div>
         </div>
 
         <div class="add-section">
-            <div class="input-group">
-                <input type="text" id="newAddr" placeholder="Paste BTC Address (bc1q..., 3..., 1...)" style="flex: 2;">
-                <input type="text" id="newLabel" placeholder="Label (e.g., Cold Storage)" style="flex: 1;">
+            <div class="add-row">
+                <div class="input-group">
+                    <input type="text" id="newAddr" placeholder="Paste BTC Address (bc1q..., 3..., 1...)" style="flex: 2;">
+                    <input type="text" id="newLabel" placeholder="Label (e.g. Cold Storage)" style="flex: 1;">
+                </div>
+                <button onclick="addWallet()" class="btn btn-primary"><i class="fas fa-plus"></i> Track</button>
+                <button onclick="fetchAllData()" class="btn btn-outline"><i class="fas fa-sync-alt"></i> Refresh</button>
             </div>
-            <button onclick="addWallet()" class="btn btn-primary"><i class="fas fa-plus"></i> Track</button>
-            <button onclick="fetchAllData()" class="btn btn-outline"><i class="fas fa-sync-alt"></i> Refresh</button>
+            
+            <div class="tools-row">
+                <input type="file" id="jsonFile" accept=".json" class="hidden" onchange="handleFileImport(this)">
+                <button onclick="document.getElementById('jsonFile').click()" class="btn btn-outline btn-sm">
+                    <i class="fas fa-file-upload"></i> Import JSON
+                </button>
+                <button onclick="exportData()" class="btn btn-outline btn-sm">
+                    <i class="fas fa-file-download"></i> Export JSON
+                </button>
+            </div>
         </div>
 
         <div class="table-container">
@@ -138,324 +139,223 @@
                         <th width="10%" class="text-right">Actions</th>
                     </tr>
                 </thead>
-                <tbody id="walletTableBody">
-                    </tbody>
+                <tbody id="walletTableBody"></tbody>
             </table>
             <div id="emptyState" style="text-align: center; padding: 40px; color: var(--text-muted);">
                 <i class="fas fa-search-dollar fa-3x" style="margin-bottom: 15px; opacity: 0.3;"></i><br>
-                No wallets tracked yet. Add an address above.
+                No wallets tracked yet. Add address or Import JSON.
             </div>
-        </div>
-        
-        <div class="text-right" style="margin-top: 10px; font-size: 0.8rem; color: var(--text-muted);">
-            Data provided by Mempool.space & CoinGecko
         </div>
     </div>
 
     <div id="txModal" class="modal-overlay">
         <div class="modal">
             <div class="modal-header">
-                <div>
-                    <h3 style="margin:0;"><i class="fas fa-history"></i> Wallet History</h3>
-                    <div id="modalLabel" style="font-size: 0.9rem; opacity: 0.9; margin-top: 5px;"></div>
-                </div>
+                <h3 style="margin:0;"><i class="fas fa-history"></i> Wallet Details</h3>
                 <button onclick="closeModal()" style="background:none; border:none; color:white; font-size: 1.5rem; cursor:pointer;">&times;</button>
             </div>
-            
-            <div style="padding: 20px; background: rgba(0,0,0,0.02); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 20px;">
-                <img id="qrImage" src="" alt="QR" style="width: 80px; height: 80px; border-radius: 8px; border: 1px solid #ddd;">
+            <div style="padding: 20px; background: rgba(0,0,0,0.02); display: flex; gap: 20px; border-bottom: 1px solid var(--border);">
+                <img id="qrImage" src="" style="width: 80px; height: 80px; border-radius: 8px;">
                 <div>
-                    <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted);">Current Balance</div>
                     <div id="modalBalance" style="font-size: 1.5rem; font-weight: bold; color: var(--primary);"></div>
                     <div id="modalAddress" style="font-family: monospace; color: var(--text-muted); font-size: 0.9rem;"></div>
                 </div>
             </div>
-
-            <div class="modal-body">
-                <h4 style="margin-top:0; border-bottom: 2px solid var(--primary); display:inline-block; padding-bottom:5px;">Recent Transactions</h4>
-                <div id="txListContainer">Loading transactions...</div>
-            </div>
+            <div class="modal-body" id="txListContainer">Loading...</div>
         </div>
     </div>
 
     <script>
-        // --- Configuration & State ---
-        const STORE_KEY = 'btc_pro_dashboard_v1';
-        let state = {
-            wallets: JSON.parse(localStorage.getItem(STORE_KEY)) || [],
-            btcPrice: 0,
-            currency: 'USD'
-        };
+        const STORE_KEY = 'btc_pro_dashboard_v2';
+        let state = { wallets: JSON.parse(localStorage.getItem(STORE_KEY)) || [], btcPrice: 0 };
 
-        // --- Initialization ---
         window.onload = async () => {
             renderWallets();
-            updateStats();
             await fetchPrice();
-            if (state.wallets.length > 0) {
-                await fetchAllData();
-            }
+            if (state.wallets.length > 0) fetchAllData();
         };
 
-        // --- Core Logic ---
+        // --- IMPORT / EXPORT LOGIC ---
+        function exportData() {
+            if(state.wallets.length === 0) return alert("No data to export.");
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state.wallets, null, 2));
+            const dlAnchor = document.createElement('a');
+            dlAnchor.setAttribute("href", dataStr);
+            dlAnchor.setAttribute("download", "btc_wallets.json");
+            document.body.appendChild(dlAnchor);
+            dlAnchor.click();
+            dlAnchor.remove();
+        }
+
+        function handleFileImport(input) {
+            const file = input.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if(!Array.isArray(data)) throw new Error("File must be a JSON array.");
+                    
+                    let count = 0;
+                    data.forEach(item => {
+                        // Compatibility mapping: supports both new format and your 'lastKnownBalance' format
+                        const addr = item.address;
+                        if(addr && !state.wallets.find(w => w.address === addr)) {
+                            state.wallets.push({
+                                address: addr,
+                                label: item.label || "Imported Wallet",
+                                // Map 'lastKnownBalance' (your file) to 'balance' (app state)
+                                balance: item.balance !== undefined ? item.balance : (item.lastKnownBalance || 0),
+                                tx_count: item.tx_count !== undefined ? item.tx_count : (item.txCount || 0),
+                                last_updated: null
+                            });
+                            count++;
+                        }
+                    });
+                    
+                    saveState();
+                    renderWallets();
+                    fetchAllData(); // Refresh to get latest data
+                    alert(`Successfully imported ${count} new wallets.`);
+                } catch(err) {
+                    alert("Import Failed: " + err.message);
+                }
+            };
+            reader.readAsText(file);
+            input.value = ''; // Reset
+        }
+
+        // --- CORE FUNCTIONS ---
         function saveState() {
             localStorage.setItem(STORE_KEY, JSON.stringify(state.wallets));
             updateStats();
         }
 
         function addWallet() {
-            const addrInput = document.getElementById('newAddr');
-            const labelInput = document.getElementById('newLabel');
-            const address = addrInput.value.trim();
-            const label = labelInput.value.trim();
-
-            if (!address) return alert("Please enter a valid Bitcoin address.");
-            if (state.wallets.find(w => w.address === address)) return alert("Address already tracked.");
-
-            state.wallets.push({
-                address,
-                label: label || 'My Wallet',
-                balance: 0,
-                tx_count: 0,
-                last_updated: null
-            });
-
-            addrInput.value = '';
-            labelInput.value = '';
+            const addr = document.getElementById('newAddr').value.trim();
+            const lbl = document.getElementById('newLabel').value.trim();
+            if(!addr) return;
+            if(state.wallets.find(w => w.address === addr)) return alert("Exists!");
+            
+            state.wallets.push({ address: addr, label: lbl || 'Wallet', balance: 0, tx_count: 0, last_updated: null });
             saveState();
             renderWallets();
-            fetchWalletData(address); // Fetch immediate data
+            fetchWalletData(addr);
+            document.getElementById('newAddr').value = '';
         }
 
-        function removeWallet(address) {
-            if (confirm("Stop tracking this address?")) {
-                state.wallets = state.wallets.filter(w => w.address !== address);
+        function removeWallet(addr) {
+            if(confirm("Remove wallet?")) {
+                state.wallets = state.wallets.filter(w => w.address !== addr);
                 saveState();
                 renderWallets();
             }
         }
 
-        function updateLabel(address) {
-            const w = state.wallets.find(w => w.address === address);
-            const newLabel = prompt("Edit Label:", w.label);
-            if (newLabel !== null) {
-                w.label = newLabel;
-                saveState();
-                renderWallets();
-            }
-        }
-
-        // --- API Data Fetching ---
+        // --- API & RENDER ---
         async function fetchPrice() {
             try {
-                const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
-                const data = await res.json();
-                state.btcPrice = data.bitcoin.usd;
-                
-                document.getElementById('btcPriceDisplay').innerHTML = 
-                    `$${state.btcPrice.toLocaleString()}`;
-                updateStats();
-                renderWallets(); // Re-render to update USD values
-            } catch (e) {
-                console.error("Price Fetch Error", e);
-            }
+                const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
+                const d = await r.json();
+                state.btcPrice = d.bitcoin.usd;
+                document.getElementById('btcPriceDisplay').innerText = `$${state.btcPrice.toLocaleString()}`;
+                renderWallets();
+            } catch(e) { console.error(e); }
         }
 
         async function fetchAllData() {
-            setLoading(true);
-            const promises = state.wallets.map(w => fetchWalletData(w.address));
-            await Promise.all(promises);
-            setLoading(false);
+            document.getElementById('loader').style.display = 'block';
+            document.getElementById('loaderBar').style.width = '70%';
+            await Promise.all(state.wallets.map(w => fetchWalletData(w.address)));
+            document.getElementById('loaderBar').style.width = '100%';
+            setTimeout(() => { document.getElementById('loader').style.display = 'none'; document.getElementById('loaderBar').style.width = '0'; }, 300);
         }
 
-        async function fetchWalletData(address) {
+        async function fetchWalletData(addr) {
             try {
-                const res = await fetch(`https://mempool.space/api/address/${address}`);
-                if (!res.ok) throw new Error("Invalid Address");
-                const data = await res.json();
+                const r = await fetch(`https://mempool.space/api/address/${addr}`);
+                if(!r.ok) return;
+                const d = await r.json();
+                const bal = (d.chain_stats.funded_txo_sum - d.chain_stats.spent_txo_sum) / 100000000;
                 
-                const confirmed = data.chain_stats.funded_txo_sum - data.chain_stats.spent_txo_sum;
-                const mempool = data.mempool_stats.funded_txo_sum - data.mempool_stats.spent_txo_sum;
-                const balanceSats = confirmed + mempool;
-                const balanceBTC = balanceSats / 100000000;
-
-                const wallet = state.wallets.find(w => w.address === address);
-                if (wallet) {
-                    wallet.balance = balanceBTC;
-                    wallet.tx_count = data.chain_stats.tx_count + data.mempool_stats.tx_count;
-                    wallet.last_updated = new Date().toISOString();
+                const w = state.wallets.find(x => x.address === addr);
+                if(w) {
+                    w.balance = bal;
+                    w.tx_count = d.chain_stats.tx_count;
                     saveState();
                     renderWallets();
                 }
-            } catch (e) {
-                console.error(`Error fetching ${address}`, e);
-            }
+            } catch(e) {}
         }
 
-        async function fetchTransactions(address) {
-            try {
-                // Fetch last 50 Txs
-                const res = await fetch(`https://mempool.space/api/address/${address}/txs`);
-                const txs = await res.json();
-                renderTxList(address, txs);
-            } catch (e) {
-                document.getElementById('txListContainer').innerHTML = '<p class="text-danger">Failed to load transactions.</p>';
-            }
-        }
-
-        // --- UI Rendering ---
         function renderWallets() {
             const tbody = document.getElementById('walletTableBody');
-            const empty = document.getElementById('emptyState');
             tbody.innerHTML = '';
-
-            if (state.wallets.length === 0) {
-                empty.style.display = 'block';
-                return;
-            }
-            empty.style.display = 'none';
+            if(state.wallets.length === 0) { document.getElementById('emptyState').style.display = 'block'; return; }
+            document.getElementById('emptyState').style.display = 'none';
 
             state.wallets.forEach(w => {
-                const usdValue = (w.balance * state.btcPrice);
-                
+                const usd = w.balance * state.btcPrice;
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>
-                        <div style="font-weight:bold;">${w.label} <i class="fas fa-pen" style="font-size:0.7rem; color:#aaa; cursor:pointer;" onclick="updateLabel('${w.address}')"></i></div>
-                        <div class="addr-pill" onclick="copyToClipboard('${w.address}')">
-                            ${w.address.substring(0, 10)}...${w.address.substring(w.address.length - 6)}
-                            <i class="far fa-copy" style="margin-left:5px;"></i>
-                        </div>
+                        <div style="font-weight:bold;">${w.label}</div>
+                        <div class="addr-pill" onclick="navigator.clipboard.writeText('${w.address}')">${w.address.substring(0,8)}...${w.address.slice(-6)}</div>
                     </td>
-                    <td>
-                        <div style="font-weight:700;">${w.balance.toFixed(8)} BTC</div>
-                    </td>
-                    <td>
-                        <div style="color: #198754; font-weight:600;">$${usdValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-                    </td>
-                    <td>
-                        <span class="badge" style="background:#e9ecef; color:#333; font-size:0.8rem;">${w.tx_count} Txs</span>
-                    </td>
+                    <td><b>${w.balance.toFixed(8)} BTC</b></td>
+                    <td style="color:var(--success); font-weight:600;">$${usd.toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+                    <td>${w.tx_count} Txs</td>
                     <td class="text-right">
-                        <button class="btn btn-outline btn-sm" onclick="openModal('${w.address}')"><i class="fas fa-list-ul"></i> Details</button>
-                        <button class="btn btn-outline btn-sm" style="border-color: #dc3545; color: #dc3545;" onclick="removeWallet('${w.address}')"><i class="fas fa-trash"></i></button>
+                        <button class="btn btn-outline btn-sm" onclick="openModal('${w.address}')">Details</button>
+                        <button class="btn btn-outline btn-sm" onclick="removeWallet('${w.address}')" style="color:var(--danger); border-color:var(--danger);">×</button>
                     </td>
                 `;
                 tbody.appendChild(tr);
             });
+            updateStats();
         }
 
         function updateStats() {
-            const totalBtc = state.wallets.reduce((acc, w) => acc + w.balance, 0);
-            const totalUsd = totalBtc * state.btcPrice;
-            
-            document.getElementById('walletCountDisplay').innerText = state.wallets.length;
-            document.getElementById('totalBtcDisplay').innerText = `${totalBtc.toFixed(8)} BTC`;
-            document.getElementById('totalUsdDisplay').innerText = `$${totalUsd.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            const totalBtc = state.wallets.reduce((a, b) => a + b.balance, 0);
+            document.getElementById('totalBtcDisplay').innerText = totalBtc.toFixed(8) + " BTC";
+            document.getElementById('totalUsdDisplay').innerText = "$" + (totalBtc * state.btcPrice).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2});
         }
 
-        function renderTxList(address, txs) {
-            const container = document.getElementById('txListContainer');
-            container.innerHTML = '';
-
-            if (txs.length === 0) {
-                container.innerHTML = '<p>No transaction history found.</p>';
-                return;
-            }
-
-            txs.forEach(tx => {
-                // Determine if Incoming or Outgoing
-                // This is a simplified check. Accurate check requires parsing all vins/vouts.
-                // Here we check if address is in inputs (Sent) or only in outputs (Received).
-                
-                const isSent = tx.vin.some(vin => vin.prevout.scriptpubkey_address === address);
-                let amount = 0;
-                let typeClass = '';
-                let typeLabel = '';
-
-                if (isSent) {
-                    typeClass = 'tx-out';
-                    typeLabel = 'SENT';
-                    // Calculate sent amount (rough estimate for dashboard)
-                    // Real calculation requires summing inputs - change
-                    amount = tx.vin.reduce((acc, v) => v.prevout.scriptpubkey_address === address ? acc + v.prevout.value : acc, 0); 
-                } else {
-                    typeClass = 'tx-in';
-                    typeLabel = 'RECEIVED';
-                    amount = tx.vout.reduce((acc, v) => v.scriptpubkey_address === address ? acc + v.value : acc, 0);
-                }
-                
-                const date = new Date(tx.status.block_time * 1000).toLocaleString();
-                const statusBadge = tx.status.confirmed ? 
-                    `<span class="badge badge-confirmed">Confirmed</span>` : 
-                    `<span class="badge badge-pending">Pending</span>`;
-
-                const div = document.createElement('div');
-                div.className = 'tx-item';
-                div.innerHTML = `
-                    <div>
-                        <div class="flex-row">
-                            <span style="font-weight:bold; font-size:0.9rem;" class="${typeClass}">${typeLabel}</span>
-                            ${statusBadge}
-                        </div>
-                        <div style="font-size:0.8rem; color:#888;">${date || 'Unconfirmed'}</div>
-                        <a href="https://mempool.space/tx/${tx.txid}" target="_blank" class="tx-hash" style="font-size:0.75rem;">${tx.txid.substring(0,20)}...</a>
-                    </div>
-                    <div class="text-right">
-                        <div class="${typeClass}" style="font-size:1.1rem;">${(amount/100000000).toFixed(8)} BTC</div>
-                    </div>
-                `;
-                container.appendChild(div);
-            });
-        }
-
-        // --- Interaction Utilities ---
-        function openModal(address) {
-            const w = state.wallets.find(w => w.address === address);
-            document.getElementById('modalLabel').innerText = w.label;
-            document.getElementById('modalAddress').innerText = address;
-            document.getElementById('modalBalance').innerText = w.balance.toFixed(8) + " BTC";
-            
-            // Generate QR Code via API
-            document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${address}`;
-            
+        // --- MODAL & TXs ---
+        async function openModal(addr) {
+            const w = state.wallets.find(x => x.address === addr);
             document.getElementById('txModal').style.display = 'flex';
-            document.getElementById('txListContainer').innerHTML = '<div style="padding:20px; text-align:center;"><i class="fas fa-spinner fa-spin"></i> Loading blockchain data...</div>';
+            document.getElementById('modalAddress').innerText = addr;
+            document.getElementById('modalBalance').innerText = w.balance.toFixed(8) + " BTC";
+            document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${addr}`;
+            document.getElementById('txListContainer').innerHTML = 'Loading history...';
             
-            fetchTransactions(address);
+            try {
+                const r = await fetch(`https://mempool.space/api/address/${addr}/txs`);
+                const txs = await r.json();
+                let html = '';
+                txs.forEach(tx => {
+                    const isSent = tx.vin.some(v => v.prevout.scriptpubkey_address === addr);
+                    const val = isSent 
+                        ? tx.vin.reduce((a,v) => v.prevout.scriptpubkey_address === addr ? a+v.prevout.value : a, 0)
+                        : tx.vout.reduce((a,v) => v.scriptpubkey_address === addr ? a+v.value : a, 0);
+                    
+                    html += `
+                        <div class="tx-item">
+                            <div>
+                                <span style="font-weight:bold; color:${isSent ? 'var(--danger)':'var(--success)'}">${isSent?'SENT':'RECEIVED'}</span>
+                                <span class="badge ${tx.status.confirmed?'badge-confirmed':''}" style="margin-left:5px;">${tx.status.confirmed?'Confirmed':'Pending'}</span>
+                                <div style="font-size:0.75rem; color:#888;">${new Date(tx.status.block_time*1000).toLocaleString()}</div>
+                            </div>
+                            <div style="font-weight:bold;">${(val/100000000).toFixed(8)} BTC</div>
+                        </div>`;
+                });
+                document.getElementById('txListContainer').innerHTML = html || 'No transactions found.';
+            } catch(e) { document.getElementById('txListContainer').innerHTML = 'Error loading transactions.'; }
         }
 
-        function closeModal() {
-            document.getElementById('txModal').style.display = 'none';
-        }
-
-        function copyToClipboard(text) {
-            navigator.clipboard.writeText(text);
-            alert("Address copied!");
-        }
-
-        function setLoading(isLoading) {
-            const bar = document.getElementById('loaderBar');
-            const loader = document.getElementById('loader');
-            if (isLoading) {
-                loader.style.display = 'block';
-                setTimeout(() => bar.style.width = '70%', 100);
-            } else {
-                bar.style.width = '100%';
-                setTimeout(() => {
-                    loader.style.display = 'none';
-                    bar.style.width = '0%';
-                }, 300);
-            }
-        }
-
-        // Close modal on outside click
-        window.onclick = function(event) {
-            const modal = document.getElementById('txModal');
-            if (event.target == modal) {
-                closeModal();
-            }
-        }
+        function closeModal() { document.getElementById('txModal').style.display = 'none'; }
+        window.onclick = e => { if(e.target == document.getElementById('txModal')) closeModal(); }
     </script>
 </body>
 </html>
